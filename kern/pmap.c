@@ -158,6 +158,7 @@ mem_init(void)
 	//////////////////////////////////////////////////////////////////////
 	// Make 'envs' point to an array of size 'NENV' of 'struct Env'.
 	// LAB 3: Your code here.
+	envs = boot_alloc(ROUNDUP(sizeof(struct Env) * NENV, PGSIZE));
 
 	//////////////////////////////////////////////////////////////////////
 	// Now that we've allocated the initial kernel data structures, we set
@@ -194,6 +195,11 @@ mem_init(void)
 	//    - the new image at UENVS  -- kernel R, user R
 	//    - envs itself -- kernel RW, user NONE
 	// LAB 3: Your code here.
+	boot_map_region(kern_pgdir, UENVS, ROUNDUP(sizeof(struct Env) * NENV, PGSIZE),
+		PADDR(envs), PTE_U | PTE_P);
+	boot_map_region(kern_pgdir, (uintptr_t) envs, ROUNDUP(sizeof(struct Env) * NENV, PGSIZE),
+		PADDR(envs), PTE_W | PTE_P);
+
 
 	//////////////////////////////////////////////////////////////////////
 	// Use the physical memory that 'bootstack' refers to as the kernel
@@ -381,7 +387,7 @@ pgdir_walk(pde_t *pgdir, const void *va, int create)
 		struct PageInfo *pt_page =  page_alloc(ALLOC_ZERO);
 		if(!pt_page) return NULL; // Page allocation failed
 		pt_page->pp_ref += 1;
-		pgdir[PDX(va)] = page2pa(pt_page) | PTE_P;
+		pgdir[PDX(va)] = page2pa(pt_page) | PTE_P | PTE_U | PTE_W;
 		return (pte_t*) KADDR(PTE_ADDR(pgdir[PDX(va)]) + 4 * PTX(va));
 	}
 
@@ -406,11 +412,6 @@ boot_map_region(pde_t *pgdir, uintptr_t va, size_t size, physaddr_t pa, int perm
 	for(size_t i=0; i<size; i+=PGSIZE) {
 		pte_t *pte = pgdir_walk(pgdir, (void*)(va + i), true);
 		*pte = (pa + i) | perm | PTE_P;
-	}
-	if((perm & PTE_U) || (perm & PTE_W)){
-		for(uintptr_t p = ROUNDDOWN(va, PTSIZE); p - va < size; p += PTSIZE) {
-			pgdir[PDX(p)] |= perm;
-		}
 	}
 }
 
