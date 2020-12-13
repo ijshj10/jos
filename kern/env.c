@@ -191,7 +191,7 @@ env_setup_vm(struct Env *e)
 	e->env_pgdir = page2kva(p);
 	pa2page(PADDR(e->env_pgdir))->pp_ref += 1;
 	memcpy(&e->env_pgdir[PDX(UTOP)], &kern_pgdir[PDX(UTOP)],
-		PGSIZE/sizeof(pde_t) - PDX(UTOP));
+		PGSIZE - PDX(UTOP) * 4);
 
 
 	// UVPT maps the env's own page table read-only.
@@ -348,6 +348,7 @@ load_icode(struct Env *e, uint8_t *binary)
 	//  What?  (See env_run() and env_pop_tf() below.)
 
 	// LAB 3: Your code here.
+	
 	struct Elf *eh = (struct Elf*)binary;
 	if (eh->e_magic != ELF_MAGIC) {
 		panic("Wrong format\n");
@@ -355,7 +356,9 @@ load_icode(struct Env *e, uint8_t *binary)
 	e->env_tf.tf_eip = eh->e_entry;
 	struct Proghdr *ph = (struct Proghdr*)((uint8_t*)eh + eh->e_phoff);
 	struct Proghdr *eph = ph + eh->e_phnum;
+	
 	lcr3(PADDR(e->env_pgdir));
+	
 	for(; ph<eph; ph++) {
 		if(ph->p_type != ELF_PROG_LOAD) // Not a load segment
 			continue;
