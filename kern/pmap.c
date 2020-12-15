@@ -276,7 +276,11 @@ mem_init_mp(void)
 	//     Permissions: kernel RW, user NONE
 	//
 	// LAB 4: Your code here:
-
+	uintptr_t kstacktop_i = KSTACKTOP;
+	for(int i=0; i<NCPU; i++) {
+		boot_map_region(kern_pgdir, kstacktop_i - KSTKSIZE, KSTKSIZE , PADDR(percpu_kstacks[i]), PTE_P |PTE_W);
+		kstacktop_i -= KSTKSIZE + KSTKGAP;
+	}
 }
 
 // --------------------------------------------------------------
@@ -322,6 +326,9 @@ page_init(void)
 		pages[i].pp_link = page_free_list;
 		page_free_list = &pages[i];
 	}
+	struct PageInfo* mpentry_page = pa2page(MPENTRY_PADDR);
+	mpentry_page[1].pp_link = mpentry_page->pp_link;
+
 
 	size_t first_free = pa2page(PADDR(boot_alloc(0)))- pages;
 	for(i = first_free; i < npages; i++) {
@@ -596,8 +603,9 @@ mmio_map_region(physaddr_t pa, size_t size)
 	}
 
 	size = ROUNDUP(size, PGSIZE);
-	boot_map_region(curenv->env_pgdir, base, size, pa, PTE_P|PTE_PCD|PTE_PWT|PTE_W);
-
+	boot_map_region(kern_pgdir, base, size, pa, PTE_P|PTE_PCD|PTE_PWT|PTE_W);
+	base += size;
+	return (void*)(base - size);
 }
 
 static uintptr_t user_mem_check_addr;
